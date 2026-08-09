@@ -1,0 +1,43 @@
+name: infra-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  terraform-plan:
+    runs-on: ubuntu-latest
+    services:
+      localstack:
+        image: localstack/localstack:latest
+        ports:
+          - 4566:4566
+        env:
+          SERVICES: lambda,apigateway,secretsmanager,dynamodb,logs,iam,sts
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.8.5"
+
+      - name: Terraform fmt check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Wait for LocalStack
+        run: |
+          for i in $(seq 1 20); do
+            curl -s http://localhost:4566/_localstack/health && break
+            sleep 3
+          done
+
+      - name: Terraform plan against LocalStack
+        run: terraform plan -input=false -var-file=environments/local.tfvars
