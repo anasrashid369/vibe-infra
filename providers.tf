@@ -23,6 +23,7 @@ provider "aws" {
     content {
       lambda         = "http://localhost:4566"
       apigateway     = "http://localhost:4566"
+      apigatewayv2   = "http://localhost:4566"
       secretsmanager = "http://localhost:4566"
       dynamodb       = "http://localhost:4566"
       cloudwatchlogs = "http://localhost:4566"
