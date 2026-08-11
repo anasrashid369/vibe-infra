@@ -64,7 +64,7 @@ resource "aws_iam_role_policy" "lambda_permissions" {
 resource "aws_lambda_function" "bff" {
   function_name = "${var.project_name}-${var.environment}-bff"
   role          = aws_iam_role.lambda_exec.arn
-  handler       = "handlers/recommendations.handler"
+  handler       = "index.handler"
   runtime       = "nodejs20.x"
   timeout       = 15
   memory_size   = 256
