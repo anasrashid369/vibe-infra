@@ -15,10 +15,11 @@ module "dynamodb_cache" {
 module "lambda_bff" {
   source = "./modules/lambda_bff"
 
-  project_name       = var.project_name
-  environment        = var.environment
-  secrets_arn        = module.secrets.secret_arn
-  dynamodb_table_arn = module.dynamodb_cache.table_arn
+  project_name         = var.project_name
+  environment          = var.environment
+  secrets_arn          = module.secrets.secret_arn
+  dynamodb_table_arn   = module.dynamodb_cache.table_arn
+  dynamodb_table_name  = module.dynamodb_cache.table_name
 }
 
 module "api_gateway" {

@@ -16,6 +16,11 @@ variable "dynamodb_table_arn" {
   type        = string
 }
 
+variable "dynamodb_table_name" {
+  description = "Name of the DynamoDB cache table (needed at runtime, ARN alone isn't enough for the SDK)."
+  type        = string
+}
+
 variable "lambda_zip_path" {
   description = "Path to the built BFF deployment package (see vibe-bff/dist)."
   type        = string
@@ -54,7 +59,7 @@ resource "aws_iam_role_policy" "lambda_permissions" {
       },
       {
         Effect   = "Allow"
-        Action   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query"]
+        Action   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query", "dynamodb:UpdateItem"]
         Resource = var.dynamodb_table_arn
       }
     ]
@@ -66,7 +71,7 @@ resource "aws_lambda_function" "bff" {
   role          = aws_iam_role.lambda_exec.arn
   handler       = "index.handler"
   runtime       = "nodejs20.x"
-  timeout       = 15
+  timeout       = 30
   memory_size   = 256
 
   filename         = var.lambda_zip_path
@@ -75,8 +80,9 @@ resource "aws_lambda_function" "bff" {
   environment {
     variables = {
       PROVIDER_SECRETS_ID = var.secrets_arn
-      DYNAMODB_TABLE_ARN  = var.dynamodb_table_arn
-      ENVIRONMENT         = var.environment
+      DYNAMODB_TABLE_ARN   = var.dynamodb_table_arn
+      DYNAMODB_TABLE_NAME  = var.dynamodb_table_name
+      ENVIRONMENT          = var.environment
     }
   }
 }
