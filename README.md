@@ -1,77 +1,53 @@
 # vibe-infra
 
 Terraform for **Vibe**'s AWS infrastructure (Lambda BFF, API Gateway,
-Secrets Manager, DynamoDB cache), written to be environment-agnostic —
-the same configuration deploys to real AWS by swapping `use_localstack`
-and providing real credentials.
-
-No AWS account is required for local development. Everything runs
-against [LocalStack](https://www.localstack.cloud/).
-
-## Repos
-
-| Repo | Purpose |
-|---|---|
-| [`vibe-client`](../vibe-client) | Flutter mobile app |
-| [`vibe-bff`](../vibe-bff) | Node/TypeScript Lambda backend-for-frontend |
-| `vibe-infra` (this repo) | Terraform + LocalStack infra |
+Secrets Manager, DynamoDB), written to be environment-agnostic — the same
+configuration deploys to real AWS by swapping `use_localstack` and
+providing real credentials. **This project runs LocalStack-only** — no
+paid AWS account required or used.
 
 ## Structure
 
-```
-main.tf              # wires the four modules together
-variables.tf
-providers.tf          # conditional LocalStack endpoint block
+main.tf, variables.tf, providers.tf
 modules/
-  lambda_bff/          # the BFF Lambda function + IAM role
-  api_gateway/          # HTTP API + routes + Lambda permission
-  secrets/               # Secrets Manager (provider API keys)
-  dynamodb_cache/         # optional response cache / audit log
+lambda_bff/ # Lambda + IAM role/policy
+api_gateway/ # REST API v1 ({proxy+} + ANY method) -- NOT HTTP API v2,
+# which requires a LocalStack license tier we don't have
+secrets/ # Secrets Manager (provider API keys)
+dynamodb_cache/ # metrics counters + response cache
 environments/
-  local.tfvars           # LocalStack
-  prod.tfvars             # placeholder, unused until a real AWS account exists
-```
+local.tfvars # LocalStack (the only environment actually used)
+prod.tfvars # placeholder, unused, kept for reference only
+
 
 ## Local workflow
 
+**Always start LocalStack via the CLI, not `docker compose`** — the
+Pro image in `docker-compose.yml` needs a `LOCALSTACK_AUTH_TOKEN` env var
+we don't have configured; the CLI handles free-tier license activation
+automatically.
+
 ```bash
-docker compose up -d localstack
+localstack start -d
+# wait ~15s
 terraform init
 terraform apply -var-file="environments/local.tfvars"
+terraform output api_endpoint
 ```
 
-This stands up the full BFF stack (Lambda, API Gateway, Secrets Manager,
-DynamoDB) against LocalStack from a clean checkout — see the MVP
-acceptance criteria in the project spec.
-
-Before applying, build the BFF deployment package expected by
-`modules/lambda_bff` (`lambda_zip_path`, default
-`../vibe-bff/dist/bundle.zip`):
-
-```bash
-cd ../vibe-bff
-npm run build
-# TODO(Phase 1): add a bundling step (esbuild/zip) that produces dist/bundle.zip
-```
+**LocalStack does not persist state across container restarts** in our
+setup. If you restart Docker/your machine, `terraform apply` will recreate
+everything and the REST API ID **will change** — always confirm the current
+ID with `terraform output api_endpoint` before pointing the client at it,
+and re-run `vibe-bff/scripts/update-secret.ts` to repopulate real API keys
+(the secret resets to placeholders on recreation).
 
 ## CI
 
-`.github/workflows/infra-ci.yml` runs `terraform fmt -check`,
-`terraform validate`, and `terraform plan` against a LocalStack service
-container on every push/PR — proof the IaC is mechanically verified, not
-just written and forgotten.
-
-## Real AWS (Phase 5, stretch)
-
-Swap `environments/prod.tfvars` (`use_localstack = false`), supply real
-`aws_access_key`/`aws_secret_key` (via CI secrets or env vars — never
-committed), and apply:
-
-```bash
-terraform apply -var-file="environments/prod.tfvars"
-```
+`.github/workflows/infra-ci.yml` runs `terraform fmt/validate/plan` against
+a LocalStack service container on every push/PR.
 
 ## Status
-
-Scaffold only — Phase 0. Modules define real resources but have not been
-applied against LocalStack yet; that's the first task of Phase 1.
+All 15 resources deploy cleanly and have been verified end-to-end multiple
+times across development sessions, including under real provider outages
+(Gemini 503s triggering live failover to Groq).
